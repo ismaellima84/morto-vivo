@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desafio Morto-Vivo Binário</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        /* --- NAVEGAÇÃO SUPERIOR (FASES) --- */
+        .nav-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 25px;
+            background-color: #bdc3c7;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: lowercase; /* Preferência minúscula */
+        }
+
+        .nav-btn::first-letter { text-transform: uppercase; } /* Apenas 1ª letra maiúscula */
+
+        .nav-btn.active {
+            background-color: #2c3e50;
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Estilo extra para o botão de desafio para destacar levemente quando ativo */
+        .nav-btn#btn4.active {
+            background-color: #8e44ad;
+        }
+
+        .phase-title {
+            color: #2c3e50;
+            margin-bottom: 5px;
+            text-transform: none; /* Evitar maiúsculas forçadas */
+        }
+        
+        .phase-desc {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        /* --- PALCO DOS BONECOS --- */
+        .stage {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px auto;
+            flex-wrap: wrap;
+        }
+
+        /* --- NOVO: REGRA PARA OCULTAR NÚMEROS NO DESAFIO --- */
+        /* Usa visibility: hidden para esconder o número mas manter o espaçamento */
+        .stage.challenge-active .bit-value {
+            visibility: hidden; 
+        }
+
+        .student-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80px;
+            justify-content: flex-end; 
+        }
+
+        .bit-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #d35400; /* Laranja Abóbora fixo */
+            margin-bottom: 10px;
+            transition: opacity 0.3s;
+        }
+
+        .student {
+            width: 60px;
+            /* Altura controlada via JS */
+            background-color: #3498db;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            user-select: none;
+            z-index: 10;
+        }
+
+        .student::before {
+            content: '';
+            position: absolute;
+            top: -25px;
+            width: 30px;
+            height: 30px;
+            background-color: #f1c40f; 
+            border-radius: 50%;
+            transition: top 0.3s ease;
+        }
+
+        .student.dead { height: 50px; background-color: #95a5a6; margin-top: 70px; }
+        .student.dead::before { top: -15px; background-color: #bdc3c7; }
+        .student.alive { height: 120px; background-color: #2ecc71; margin-top: 0; }
+
+        .state-label {
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: lowercase;
+        }
+        .label-dead { color: #95a5a6; }
+        .label-alive { color: #27ae60; }
+
+        /* --- TABELA DE REFERÊNCIA (Movida para cima) --- */
+        .reference-table {
+            display: none; /* Só aparece na fase 3 */
+            margin: 20px auto;
+            max-width: 800px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #3498db;
+        }
+        .reference-table.visible { display: block; }
+
+        .ref-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+            gap: 5px;
+        }
+        .ref-cell {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            text-align: center;
+        }
+        .ref-char { font-weight: bold; color: #2c3e50; font-size: 1.1rem; }
+        .ref-num { font-size: 0.8rem; color: #7f8c8d; }
+        
+        .special-char { background-color: #e8f6f3; border-color: #1abc9c; }
+        .space-char { background-color: #fcf3cf; border-color: #f1c40f; }
+
+        /* --- PAINEL DE RESULTADOS --- */
+        .dashboard {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 700px;
+            margin: 30px auto;
+            text-align: center;
+            transition: height 0.3s;
+        }
+
+        /* Toggle Switch Styles */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+            margin: 0 10px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #3498db; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        /* Classes para ocultar resultados */
+        .results-container {
+            transition: opacity 0.3s;
+        }
+        .results-container.hidden {
+            opacity: 0;
+            visibility: hidden;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .info-section { display: none; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .info-section.visible { display: block; }
+
+        .result-box {
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+
+        .calc-text { font-family: monospace; font-size: 1.2rem; color: #d35400; }
+        .bin-text { font-family: monospace; letter-spacing: 5px; color: #2980b9; }
+        .char-text { color: #8e44ad; font-size: 2.5rem; }
+
+        .reset-btn {
+            margin-top: 10px;
+            padding: 8px 20px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .reset-btn:hover { background-color: #c0392b; }
+
+        /* --- ÁREA DO DESAFIO (NOVO) --- */
+        #challengeArea {
+            display: none;
+            background-color: #fcf3cf;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px dashed #f1c40f;
+            margin-bottom: 20px;
+        }
+
+        .challenge-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .btn-num { background-color: #d35400; }
+        .btn-char { background-color: #8e44ad; }
+
+        .target-display {
+            font-size: 1.5rem;
+            color: #2c3e50;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .success-message {
+            color: #27ae60;
+            font-size: 2rem;
+            font-weight: 800;
+            margin-top: 10px;
+            display: none;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="nav-container">
+        <button class="nav-btn active" onclick="setPhase(1)" id="btn1">1º momento</button>
+        <button class="nav-btn" onclick="setPhase(2)" id="btn2">2º momento</button>
+        <button class="nav-btn" onclick="setPhase(3)" id="btn3">3º momento</button>
+        <button class="nav-btn" onclick="setPhase(4)" id="btn4">Desafio</button>
+    </div>
+
+    <h1 class="phase-title" id="mainTitle">Valores dos Bits</h1>
+    <p class="phase-desc" id="subTitle">Clique nos estudantes para somar os valores das posições.</p>
+
+    <div class="stage" id="stageArea"></div>
+
+    <div class="reference-table" id="refTable">
+        <h4 style="margin:0 0 10px 0; color:#3498db; text-transform: lowercase;">tabela de conversão </h4>
+        <div class="ref-grid" id="gridContainer"></div>
+    </div>
+
+    <div class="dashboard">
+
+        <div id="challengeArea">
+            <p style="margin:0 0 10px 0;">Escolha o tipo de desafio:</p>
+            <button class="challenge-btn btn-num" onclick="startChallenge('num')">Sortear Número</button>
+            <button class="challenge-btn btn-char" onclick="startChallenge('char')">Sortear Letra</button>
+            
+            <div class="target-display" id="targetText"></div>
+            <div class="success-message" id="successMsg">CORRETO!</div>
+        </div>
+        <div class="toggle-container" id="toggleContainer">
+            <span>ocultar resultado</span>
+            <label class="switch">
+                <input type="checkbox" onchange="toggleResults(this)" id="toggleCheck">
+                <span class="slider"></span>
+            </label>
+            <span>mostrar resultado</span>
+        </div>
+
+        <div id="resultsWrapper" class="results-container hidden">
+            <div id="section-calc" class="info-section visible">
+                <small>cálculo do valor:</small>
+                <div class="calc-text" id="calcDisplay">0 + 0 + 0 + 0 + 0</div>
+                <div class="result-box" style="color: #d35400;" id="decimalDisplay">0</div>
+            </div>
+
+            <div id="section-bin" class="info-section">
+                <small>código binário:</small>
+                <div class="result-box bin-text" id="binaryDisplay">0 0 0 0 0</div>
+            </div>
+
+            <div id="section-char" class="info-section">
+                <small>caractere decodificado:</small>
+                <div class="result-box char-text" id="charDisplay">[ ]</div>
+            </div>
+        </div>
+
+        <button class="reset-btn" onclick="resetAll()">zerar posições</button>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        let bits = [0, 0, 0, 0, 0];
+        const values = [1, 2, 4, 8, 16];
+        let currentPhase = 1;
+        
+        // Variáveis para o Desafio
+        let targetValue = -1; // -1 significa nenhum desafio ativo
+
+        // Tabela de caracteres completa
+        const charMap = [
+            {v:0, c:"[ ]"}, {v:1, c:"a"}, {v:2, c:"b"}, {v:3, c:"c"}, {v:4, c:"d"}, {v:5, c:"e"},
+            {v:6, c:"f"}, {v:7, c:"g"}, {v:8, c:"h"}, {v:9, c:"i"}, {v:10, c:"j"},
+            {v:11, c:"k"}, {v:12, c:"l"}, {v:13, c:"m"}, {v:14, c:"n"}, {v:15, c:"o"},
+            {v:16, c:"p"}, {v:17, c:"q"}, {v:18, c:"r"}, {v:19, c:"s"}, {v:20, c:"t"},
+            {v:21, c:"u"}, {v:22, c:"v"}, {v:23, c:"w"}, {v:24, c:"x"}, {v:25, c:"y"}, {v:26, c:"z"},
+            {v:27, c:"."}, {v:28, c:","}, {v:29, c:"´"}, {v:30, c:"~"}, {v:31, c:"^"}
+        ];
+
+        // --- INICIALIZAÇÃO ---
+        function init() {
+            renderStage();
+            renderRefTable();
+            setPhase(1); // Começa na fase 1
+        }
+
+        // Gera os bonecos HTML
+        function renderStage() {
+            const stage = document.getElementById('stageArea');
+            let html = '';
+            // Ordem 4 a 0 (16 a 1)
+            for(let i=4; i>=0; i--) {
+                html += `
+                <div class="student-container"> 
+                    <div class="bit-value">${values[i]}</div>
+                    <div class="student dead" id="bit${i}" onclick="toggleBit(${i})">0</div>
+                    <div class="state-label label-dead" id="label${i}">morto</div>
+                </div>`;
+            }
+            stage.innerHTML = html;
+        }
+
+        // Gera a tabela de referência visualmente
+        function renderRefTable() {
+            const grid = document.getElementById('gridContainer');
+            let html = '';
+            
+            for(let i=0; i<charMap.length; i++) {
+                const item = charMap[i];
+                let specialClass = '';
+                if (i === 0) specialClass = 'space-char';
+                else if (i > 26) specialClass = 'special-char';
+
+                let displayChar = item.c; 
+                if (i===0) displayChar = "[ ]";
+
+                html += `
+                <div class="ref-cell ${specialClass}">
+                    <div class="ref-char">${displayChar}</div>
+                    <div class="ref-num">${item.v}</div>
+                </div>`;
+            }
+            grid.innerHTML = html;
+        }
+
+        // --- LÓGICA DO JOGO ---
+        function toggleBit(index) {
+            bits[index] = bits[index] === 0 ? 1 : 0;
+            updateUI();
+        }
+
+        function resetAll() {
+            bits = [0,0,0,0,0];
+            updateUI();
+        }
+
+        function toggleResults(checkbox) {
+            const wrapper = document.getElementById('resultsWrapper');
+            if(checkbox.checked) {
+                wrapper.classList.remove('hidden');
+            } else {
+                wrapper.classList.add('hidden');
+            }
+        }
+
+        // --- LÓGICA DO DESAFIO (NOVO) ---
+        function startChallenge(type) {
+            resetAll(); // Zera os bonecos
+            
+            // --- NOVO: FORÇA OCULTAR OS RESULTADOS ---
+            const toggle = document.getElementById('toggleCheck');
+            const wrapper = document.getElementById('resultsWrapper');
+            toggle.checked = false; // Desmarca o botão
+            wrapper.classList.add('hidden'); // Esconde o painel
+            // ------------------------------------------
+
+            // Sorteia número entre 1 e 31
+            targetValue = Math.floor(Math.random() * 31) + 1;
+            
+            const display = document.getElementById('targetText');
+            document.getElementById('successMsg').style.display = 'none';
+
+            if (type === 'num') {
+                display.innerHTML = `Acenda os bonecos para somar: <span style="font-size:2rem; color:#d35400;">${targetValue}</span>`;
+            } else {
+                const charObj = charMap.find(x => x.v === targetValue);
+                display.innerHTML = `Faça a combinação para a letra: <span style="font-size:2rem; color:#8e44ad;">${charObj.c.toUpperCase()}</span>`;
+            }
+        }
+
+        // --- CONTROLE DE FASES ---
+        function setPhase(phase) {
+            currentPhase = phase;
+            resetAll(); 
+
+            // Reseta visual da toggle
+            document.querySelector('.switch input').checked = false; 
+            document.getElementById('resultsWrapper').classList.add('hidden');
+           
+            // Atualiza botões
+            document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
+                if(idx + 1 === phase) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            const title = document.getElementById('mainTitle');
+            const sub = document.getElementById('subTitle');
+            
+            // Elementos visuais
+            const stage = document.getElementById('stageArea');
+            const secCalc = document.getElementById('section-calc');
+            const secBin = document.getElementById('section-bin');
+            const secChar = document.getElementById('section-char');
+            const refTable = document.getElementById('refTable');
+            const challengeArea = document.getElementById('challengeArea');
+            const toggleContainer = document.getElementById('toggleContainer');
+
+            // Reset geral: esconde tudo e remove classe de desafio do palco
+            stage.classList.remove('challenge-active'); // Devolve os números
+            secCalc.classList.remove('visible');
+            secBin.classList.remove('visible');
+            secChar.classList.remove('visible');
+            refTable.classList.remove('visible');
+            challengeArea.style.display = 'none';
+            toggleContainer.style.display = 'flex';
+            targetValue = -1; // Desativa desafio se mudar de fase
+            
+            if(phase === 1) {
+                title.innerText = "1º momento: O estado do bit";
+                sub.innerText = "Levante os estudantes para somar os valores das posições (16, 8, 4, 2, 1).";
+                secCalc.classList.add('visible');
+            } 
+            else if(phase === 2) {
+                title.innerText = "2º momento: binário para decimal";
+                sub.innerText = "Observe a sequência de 0s e 1s e veja o número decimal formado.";
+                secCalc.classList.add('visible');
+                secBin.classList.add('visible');
+            } 
+            else if(phase === 3) {
+                title.innerText = "3º momento: codificando caracteres";
+                sub.innerText = "Use a tabela abaixo para formar letras e escrever palavras.";
+                secCalc.classList.add('visible'); 
+                secBin.classList.add('visible');  
+                secChar.classList.add('visible'); 
+                refTable.classList.add('visible'); 
+            }
+            else if(phase === 4) { // FASE NOVA
+                title.innerText = "Desafio Computacional";
+                sub.innerText = "O computador vai te desafiar. Tente acertar a combinação sem ver os valores!";
+                
+                // NOVO: Adiciona a classe que esconde os números 16, 8, 4, 2, 1
+                stage.classList.add('challenge-active');
+
+                challengeArea.style.display = 'block'; // Mostra painel de desafio
+                refTable.classList.add('visible'); // Mostra tabela para ajudar
+                
+                // No desafio, mostramos o cálculo atual para ajudar o aluno
+                secCalc.classList.add('visible');
+            }
+        }
+
+        // --- ATUALIZAÇÃO DA TELA ---
+        function updateUI() {
+            let total = 0;
+            let calcStr = [];
+            let binStr = "";
+
+            for (let i = 4; i >= 0; i--) {
+                const el = document.getElementById(`bit${i}`);
+                const lbl = document.getElementById(`label${i}`);
+                const isAlive = bits[i] === 1;
+
+                if (isAlive) {
+                    el.classList.remove('dead');
+                    el.classList.add('alive');
+                    el.innerText = "1";
+                    lbl.innerText = "vivo";
+                    lbl.className = "state-label label-alive";
+                } else {
+                    el.classList.remove('alive');
+                    el.classList.add('dead');
+                    el.innerText = "0";
+                    lbl.innerText = "morto";
+                    lbl.className = "state-label label-dead";
+                }
+
+                const val = isAlive ? values[i] : 0;
+                total += val;
+                calcStr.push(val);
+                binStr += bits[i] + " ";
+            }
+
+            // Atualiza valores
+            document.getElementById('binaryDisplay').innerText = binStr;
+            document.getElementById('decimalDisplay').innerText = total;
+            document.getElementById('calcDisplay').innerText = calcStr.join(" + ");
+
+            // Atualiza Caractere (Fase 3)
+            const charDiv = document.getElementById('charDisplay');
+            if(total < charMap.length) {
+                const displayChar = (total === 0) ? "[ ]" : charMap[total].c;
+                charDiv.innerText = displayChar;
+                
+                charDiv.style.color = (total > 26) ? "#e67e22" : "#8e44ad";
+                if(total === 0) charDiv.style.color = "#ccc";
+            } else {
+                charDiv.innerText = "?";
+            }
+
+            // VERIFICAÇÃO DO DESAFIO (Fase 4)
+            if (currentPhase === 4 && targetValue !== -1) {
+                const msg = document.getElementById('successMsg');
+                if (total === targetValue) {
+                    msg.style.display = 'block';
+                } else {
+                    msg.style.display = 'none';
+                }
+            }
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
